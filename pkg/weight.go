@@ -1,10 +1,12 @@
 package pkg
 
 import (
-	"io/ioutil"
+	"fmt"
+	"io/fs"
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -14,14 +16,19 @@ import (
 	"github.com/thoas/go-funk"
 )
 
+const BIN_TARGET = "goweight-bin-target"
+
 var moduleRegex = regexp.MustCompile("packagefile (.*)=(.*)")
 
-func run(cmd []string) string {
-	out, err := exec.Command(cmd[0], cmd[1:]...).CombinedOutput()
+func run(cmd GoWeight) string {
+	fmt.Printf("execute: %s\n", strings.Join(cmd.BuildCmd, " "))
+
+	cmdE := exec.Command(cmd.BuildCmd[0], cmd.BuildCmd[1:]...)
+	out, err := cmdE.CombinedOutput()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(fmt.Errorf("command: '%s' execute failed: %s : %v", strings.Join(cmd.BuildCmd, " "), out, err))
 	}
-	os.Remove("goweight-bin-target")
+	os.Remove(BIN_TARGET)
 	return string(out)
 }
 
@@ -50,28 +57,36 @@ type ModuleEntry struct {
 }
 type GoWeight struct {
 	BuildCmd []string
+	BuildEnv []string
 }
 
-func NewGoWeight() *GoWeight {
+func NewGoWeight(workDir string) *GoWeight {
+	var err error
+	if workDir == "" {
+		workDir, err = os.Getwd()
+		if err != nil {
+			log.Fatalln(err)
+		}
+	}
 	return &GoWeight{
-		BuildCmd: []string{"go", "build", "-o", "goweight-bin-target", "-work", "-a"},
+		BuildCmd: []string{"go", "build", "-C", workDir, "-o", BIN_TARGET, "-work", "-a"},
 	}
 }
 
+// return go build temporary directory
 func (g *GoWeight) BuildCurrent() string {
-	d := strings.Split(strings.TrimSpace(run(g.BuildCmd)), "\n")[0]
+	d := strings.Split(strings.TrimSpace(run(*g)), "\n")[0]
 	return strings.Split(strings.TrimSpace(d), "=")[1]
 }
 
 func (g *GoWeight) Process(work string) []*ModuleEntry {
-
 	files, err := zglob.Glob(work + "**/importcfg")
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(fmt.Errorf("could not open directory %s: %w", work, err))
 	}
 
 	allLines := funk.Uniq(funk.FlattenDeep(funk.Map(files, func(file string) []string {
-		f, err := ioutil.ReadFile(file)
+		f, err := os.ReadFile(file)
 		if err != nil {
 			return []string{}
 		}
@@ -81,4 +96,14 @@ func (g *GoWeight) Process(work string) []*ModuleEntry {
 	sort.Slice(modules, func(i, j int) bool { return modules[i].Size > modules[j].Size })
 
 	return modules
+}
+
+// ChangePermissions recursively changes the permissions of the directory and its contents to 777
+func Perm(path string, mode fs.FileMode) error {
+	return filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		return os.Chmod(path, mode)
+	})
 }
