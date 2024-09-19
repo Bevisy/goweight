@@ -1,8 +1,10 @@
 autobrew
 vendor/
 dist/
-
-goweight
 .vscode/
 
 .DS_Store
+*.csv
+*.svg
+
+goweight

@@ -2,11 +2,9 @@ package pkg
 
 import (
 	"fmt"
-	"io/fs"
 	"log"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -96,14 +94,4 @@ func (g *GoWeight) Process(work string) []*ModuleEntry {
 	sort.Slice(modules, func(i, j int) bool { return modules[i].Size > modules[j].Size })
 
 	return modules
-}
-
-// ChangePermissions recursively changes the permissions of the directory and its contents to 777
-func Perm(path string, mode fs.FileMode) error {
-	return filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		return os.Chmod(path, mode)
-	})
 }
