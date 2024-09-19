@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/jondot/goweight/pkg"
+	"github.com/Bevisy/goweight/pkg"
 )
 
 var (
