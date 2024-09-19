@@ -1,5 +1,8 @@
 autobrew
 vendor/
 dist/
+
 goweight
 .vscode/
+
+.DS_Store
